@@ -202,9 +202,9 @@ public class MovieDao extends AbstractMFlixDao {
     // sort key
     Bson sort = Sorts.descending(sortKey);
     List<Document> movies = new ArrayList<>();
-    // TODO > Ticket: Paging - implement the necessary cursor methods to support simple
-    // pagination like skip and limit in the code below
-    moviesCollection.find(castFilter).sort(sort).iterator()
+    /*// TODO > Ticket: Paging - implement the necessary cursor methods to support simple
+    // pagination like skip and limit in the code below*/
+    moviesCollection.find(castFilter).sort(sort).limit(limit).skip(skip).iterator()
     .forEachRemaining(movies::add);
     return movies;
   }
