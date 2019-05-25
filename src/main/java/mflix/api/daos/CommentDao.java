@@ -28,7 +28,12 @@ import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Optional;
 
+import static com.mongodb.client.model.Filters.and;
+import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Updates.combine;
+import static com.mongodb.client.model.Updates.set;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
@@ -80,11 +85,17 @@ public class CommentDao extends AbstractMFlixDao {
    */
   public Comment addComment(Comment comment) {
 
-    // TODO> Ticket - Update User reviews: implement the functionality that enables adding a new
-    // comment.
+    /*// TODO> Ticket - Update User reviews: implement the functionality that enables adding a new
+    // comment.*/
     // TODO> Ticket - Handling Errors: Implement a try catch block to
     // handle a potential write exception when given a wrong commentId.
-    return null;
+    if(!Optional.ofNullable(comment.getId()).isPresent()) {
+      throw new IncorrectDaoOperation("Comment id cannot be null");
+    }
+
+    commentCollection.insertOne(comment);
+
+    return comment;
   }
 
   /**
@@ -102,11 +113,19 @@ public class CommentDao extends AbstractMFlixDao {
    */
   public boolean updateComment(String commentId, String text, String email) {
 
-    // TODO> Ticket - Update User reviews: implement the functionality that enables updating an
-    // user own comments
+    /*// TODO> Ticket - Update User reviews: implement the functionality that enables updating an
+    // user own comments*/
     // TODO> Ticket - Handling Errors: Implement a try catch block to
     // handle a potential write exception when given a wrong commentId.
-    return false;
+    UpdateResult ur = commentCollection.updateOne(
+            and(
+                    eq("_id", new ObjectId(commentId)),
+                    eq("email", email)),
+            combine(
+                    set("text", text),
+                    set("date", new Date())));
+
+    return ur.getMatchedCount() > 0 && ur.getModifiedCount() > 0;
   }
 
   /**
