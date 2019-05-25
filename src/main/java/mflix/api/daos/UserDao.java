@@ -24,7 +24,10 @@ import org.springframework.context.annotation.Configuration;
 
 import java.text.MessageFormat;
 import java.util.Map;
+import java.util.Optional;
 
+import static com.mongodb.client.model.Filters.eq;
+import static com.mongodb.client.model.Updates.set;
 import static org.bson.codecs.configuration.CodecRegistries.fromProviders;
 import static org.bson.codecs.configuration.CodecRegistries.fromRegistries;
 
@@ -61,8 +64,8 @@ public class UserDao extends AbstractMFlixDao {
    * @return True if successful, throw IncorrectDaoOperation otherwise
    */
   public boolean addUser(User user) {
-    //TODO > Ticket: Durable Writes -  you might want to use a more durable write concern here!
-    usersCollection.insertOne(user);
+    /*//TODO > Ticket: Durable Writes -  you might want to use a more durable write concern here!*/
+      usersCollection.withWriteConcern(WriteConcern.MAJORITY).insertOne(user);
     return true;
     //TODO > Ticket: Handling Errors - make sure to only add new users
     // and not users that already exist.
@@ -83,7 +86,11 @@ public class UserDao extends AbstractMFlixDao {
     userSession.setUserId(userId);
     userSession.setJwt(jwt);
     try {
-      sessionsCollection.insertOne(userSession);
+        if (Optional.ofNullable(sessionsCollection.find( eq("user_id", userId) ).first()).isPresent()) {
+            sessionsCollection.updateOne(eq("user_id", userId), set("jwt", jwt));
+        } else {
+            sessionsCollection.insertOne(userSession);
+        }
       return true;
     } catch (MongoWriteException e) {
       log.error(e.getMessage(), e);
@@ -102,7 +109,7 @@ public class UserDao extends AbstractMFlixDao {
   public User getUser(String email) {
     //User user = null;
     /*//TODO> Ticket: User Management - implement the query that returns the first User object.*/
-    return usersCollection.find(Filters.eq("email", email)).iterator().tryNext();
+    return usersCollection.find(eq("email", email)).iterator().tryNext();
   }
 
   /**
@@ -114,13 +121,13 @@ public class UserDao extends AbstractMFlixDao {
   public Session getUserSession(String userId) {
     /*//TODO> Ticket: User Management - implement the method that returns Sessions for a given
     // userId*/
-    return sessionsCollection.find(Filters.eq("user_id", userId)).iterator().tryNext();
+    return sessionsCollection.find(eq("user_id", userId)).iterator().tryNext();
   }
 
   public boolean deleteUserSessions(String userId) {
     /*//TODO> Ticket: User Management - implement the delete user sessions method*/
     try {
-      sessionsCollection.deleteOne(Filters.eq("user_id", userId));
+      sessionsCollection.deleteOne(eq("user_id", userId));
       return true;
     } catch (MongoWriteException e) {
       log.error(e.getMessage(), e);
@@ -139,7 +146,7 @@ public class UserDao extends AbstractMFlixDao {
     /*//TODO> Ticket: User Management - implement the delete user method*/
     try {
       deleteUserSessions(email);
-      usersCollection.deleteOne(Filters.eq("email", email));
+      usersCollection.deleteOne(eq("email", email));
       return true;
     } catch (MongoWriteException e) {
       log.error(e.getMessage(), e);
@@ -161,8 +168,16 @@ public class UserDao extends AbstractMFlixDao {
   public boolean updateUserPreferences(String email, Map<String, ?> userPreferences) {
     //TODO> Ticket: User Preferences - implement the method that allows for user preferences to
     // be updated.
+      if (userPreferences == null) {
+          // be updated.
+          throw new IncorrectDaoOperation(String.format("%s cannot be null", userPreferences));
+      }
+      Bson queryFilter = new Document("email", email);
+      User user = usersCollection.find(queryFilter).limit(1).iterator().tryNext();
+      user.setPreferences((Map<String, String>) userPreferences);
+      usersCollection.replaceOne(queryFilter, user);
     //TODO > Ticket: Handling Errors - make this method more robust by
     // handling potential exceptions when updating an entry.
-    return false;
+    return true;
   }
 }
